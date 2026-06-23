@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instagram</title>
+  <link rel="preconnect" href="https://images.unsplash.com" />
+  <link rel="stylesheet" href="/static/styles.css?v=14" />
+</head>
+<body>
+  <section class="login-screen" id="loginScreen">
+    <div class="login-card">
+      <h1 class="login-wordmark">Instagram</h1>
+      <form id="loginForm" class="login-form">
+        <input id="loginEmail" type="email" placeholder="Email" autocomplete="email" required />
+        <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" required />
+        <label class="check-row">
+          <input id="adminLogin" type="checkbox" />
+          <span>Login as admin</span>
+        </label>
+        <button class="primary-button" id="loginButton" type="submit">Log in</button>
+        <p class="login-error" id="loginError"></p>
+      </form>
+      <div class="login-divider"><span></span><strong>or</strong><span></span></div>
+      <form id="quickSignupForm" class="login-form">
+        <input id="signupEmail" type="email" placeholder="New account email" required />
+        <input id="signupPassword" type="password" placeholder="New account password" required />
+        <button class="secondary-action" type="submit">Create user account</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="shell is-hidden" id="appShell">
+    <aside class="rail" aria-label="Primary navigation">
+      <a class="wordmark" href="/" aria-label="Instagram home">Instagram</a>
+      <nav class="rail-nav">
+        <button class="nav-item active" data-nav="home" type="button" title="Home">
+          <span data-icon="home"></span><span>Home</span>
+        </button>
+        <button class="nav-item" data-nav="reels" type="button" title="Reels">
+          <span data-icon="film"></span><span>Reels</span>
+        </button>
+        <button class="nav-item" data-nav="posts" type="button" title="Posts">
+          <span data-icon="image"></span><span>Posts</span>
+        </button>
+        <button class="nav-item" data-nav="saved" type="button" title="Saved">
+          <span data-icon="bookmark"></span><span>Saved</span>
+        </button>
+        <button class="nav-item" data-nav="profile" type="button" title="Profile">
+          <span class="tiny-avatar" id="navAvatar">IG</span><span>Profile</span>
+        </button>
+        <button class="nav-item is-hidden" id="adminNavItem" data-nav="admin" type="button" title="Admin">
+          <span data-icon="shield"></span><span>Admin</span>
+        </button>
+      </nav>
+      <button class="nav-item rail-more" id="logoutButton" type="button" title="Logout">
+        <span data-icon="log-out"></span><span>Logout</span>
+      </button>
+    </aside>
+
+    <header class="mobile-header">
+      <a class="wordmark" href="/">Instagram</a>
+      <div class="mobile-actions">
+        <button class="icon-button" data-nav="profile" type="button" title="Profile"><span class="tiny-avatar" id="bottomAvatar">IG</span></button>
+        <button class="icon-button" id="mobileLogoutButton" type="button" title="Logout"><span data-icon="log-out"></span></button>
+      </div>
+    </header>
+
+    <main class="content single-column">
+      <section class="feed-column" aria-label="Main content">
+        <div id="feedView">
+          <div class="stories-strip" id="storiesStrip" aria-label="Stories"></div>
+          <div class="feed-switch" role="tablist" aria-label="Feed type">
+            <button class="switch-button active" data-view-button="posts" type="button">Posts</button>
+            <button class="switch-button" data-view-button="reels" type="button">Reels</button>
+          </div>
+          <div class="feed" id="feed" aria-live="polite"></div>
+        </div>
+
+        <section class="page-panel is-hidden" id="profileView" aria-label="Profile"></section>
+        <section class="page-panel is-hidden" id="savedView" aria-label="Saved"></section>
+        <section class="page-panel is-hidden" id="adminView" aria-label="Admin dashboard"></section>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Mobile navigation">
+      <button class="icon-button active" data-nav="home" type="button" title="Home"><span data-icon="home"></span></button>
+      <button class="icon-button" data-nav="posts" type="button" title="Posts"><span data-icon="image"></span></button>
+      <button class="icon-button" data-nav="reels" type="button" title="Reels"><span data-icon="film"></span></button>
+      <button class="icon-button" data-nav="saved" type="button" title="Saved"><span data-icon="bookmark"></span></button>
+      <button class="icon-button" data-nav="profile" type="button" title="Profile"><span class="tiny-avatar" id="mobileNavAvatar">IG</span></button>
+    </nav>
+  </div>
+
+  <dialog class="create-dialog" id="createDialog" aria-labelledby="createTitle">
+    <div class="dialog-header">
+      <button class="icon-button" id="closeCreateModal" type="button" title="Close"><span data-icon="x"></span></button>
+      <h2 id="createTitle">Create</h2>
+      <span></span>
+    </div>
+
+    <div class="composer-tabs" role="tablist" aria-label="Create type">
+      <button class="switch-button active" data-compose-tab="post" type="button">Post</button>
+      <button class="switch-button" data-compose-tab="reel" type="button">Reel</button>
+    </div>
+
+    <form id="createPostForm" class="composer-form" data-compose-panel="post">
+      <label class="upload-preview" for="newPostPhoto" id="postPhotoPreview">
+        <span data-icon="image"></span>
+        <strong>Choose a photo</strong>
+        <small>Preview before sharing</small>
+      </label>
+      <input id="newPostPhoto" class="file-input" type="file" accept="image/*" required />
+      <textarea id="newPostCaption" rows="5" placeholder="Write a caption..." required></textarea>
+      <button class="primary-button" type="submit">Share</button>
+    </form>
+
+    <form id="createReelForm" class="composer-form hidden" data-compose-panel="reel">
+      <label class="upload-preview" for="newReelVideo" id="reelVideoPreview">
+        <span data-icon="film"></span>
+        <strong>Choose a video</strong>
+        <small>Upload from your computer</small>
+      </label>
+      <input id="newReelVideo" class="file-input" type="file" accept="video/*" required />
+      <textarea id="newReelCaption" rows="5" placeholder="Write a caption..." required></textarea>
+      <button class="primary-button" type="submit">Publish reel</button>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js?v=14"></script>
+</body>
+</html>
