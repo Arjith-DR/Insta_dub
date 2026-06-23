@@ -95,7 +95,7 @@ class Post(Base):
     user = relationship("User", back_populates="posts")
     media = relationship("PostMedia", back_populates="post")
     comments = relationship("PostComment", back_populates="post")
-    likes = relationship("PostLike", back_populates="post")
+    
 
 
 class PostMedia(Base):
@@ -123,7 +123,7 @@ class Reel(Base):
 
     user = relationship("User", back_populates="reels")
     comments = relationship("ReelComment", back_populates="reel")
-    likes = relationship("ReelLike", back_populates="reel")
+    
 
 
 class PostComment(Base):
@@ -150,30 +150,7 @@ class ReelComment(Base):
     reel = relationship("Reel", back_populates="comments")
 
 
-class PostLike(Base):
-    __tablename__ = "post_likes"
-    __table_args__ = (UniqueConstraint("post_id", "user_id", name="unique_post_like"),)
 
-    like_id = Column(Integer, primary_key=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("posts.post_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
-    is_liked = Column(Boolean)
-
-    post = relationship("Post", back_populates="likes")
-
-
-class ReelLike(Base):
-    __tablename__ = "reel_likes"
-    __table_args__ = (UniqueConstraint("reel_id", "user_id", name="unique_reel_like"),)
-
-    like_id = Column(Integer, primary_key=True, autoincrement=True)
-    reel_id = Column(Integer, ForeignKey("reels.reel_id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
-    is_liked = Column(Boolean)
-
-    reel = relationship("Reel", back_populates="likes")
 
 
 class SavedCategory(Base):
