@@ -17,7 +17,7 @@ def serialize_mongo_doc(doc):
     return doc
 
 
-async def record_post_like(post_id: int, post_owner_user_id: int | None, liked_by_user_id: int):
+async def record_post_like(post_id: int, post_owner_user_id: int , liked_by_user_id: int):
     await ensure_like_indexes()
     db = get_mongo_db()
     document = {
@@ -65,7 +65,7 @@ async def get_post_like_details(post_id: int):
         raise HTTPException(status_code=500, detail=f"MongoDB post like read failed: {exc}") from exc
 
 
-async def record_reel_like(reel_id: int, reel_owner_user_id: int | None, liked_by_user_id: int):
+async def record_reel_like(reel_id: int, reel_owner_user_id: int, liked_by_user_id: int):
     await ensure_like_indexes()
     db = get_mongo_db()
     document = {
@@ -111,3 +111,21 @@ async def get_reel_like_details(reel_id: int):
         return [serialize_mongo_doc(doc) async for doc in cursor]
     except PyMongoError as exc:
         raise HTTPException(status_code=500, detail=f"MongoDB reel like read failed: {exc}") from exc
+
+
+async def remove_post_likes_for_post(post_id: int):
+    db = get_mongo_db()
+    try:
+        result = await db.post_likes.delete_many({"post_id": post_id})
+        return result.deleted_count  # number of likes removed
+    except PyMongoError as exc:
+        raise HTTPException(status_code=500, detail=f"MongoDB post likes delete failed: {exc}") from exc
+
+
+async def remove_reel_likes_for_reel(reel_id: int):
+    db = get_mongo_db()
+    try:
+        result = await db.reel_likes.delete_many({"reel_id": reel_id})
+        return result.deleted_count  # number of likes removed
+    except PyMongoError as exc:
+        raise HTTPException(status_code=500, detail=f"MongoDB post likes delete failed: {exc}") from exc

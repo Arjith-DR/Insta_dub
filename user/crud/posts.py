@@ -3,8 +3,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_, delete
 from fastapi import HTTPException
 from settings.database import get_session
-from models import Post, PostComment, PostLike, PostMedia, Privacy, Follower
-from user.crud.mongo_likes import record_post_like, remove_post_like, get_post_like_details
+from models import Post, PostComment,PostMedia, Privacy, Follower
+from user.crud.mongo_likes import remove_post_likes_for_post
+
+
 
 
 async def create_post(user_id: int, caption: str, status="active"):
@@ -71,7 +73,7 @@ async def delete_post(post_id: int):
         try:
             post = await session.get(Post, post_id)
             if post:
-                await session.execute(delete(PostLike).where(PostLike.post_id == post_id))
+                await remove_post_likes_for_post(post_id)
                 await session.execute(delete(PostComment).where(PostComment.post_id == post_id))
                 await session.execute(delete(PostMedia).where(PostMedia.post_id == post_id))
                 await session.delete(post)
@@ -113,66 +115,6 @@ async def delete_post_comment(comment_id: int):
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
-async def like_post(post_id: int, user_id: int):
-    async with get_session() as session:
-        try:
-            post = await session.get(Post, post_id)
-            if not post:
-                raise HTTPException(status_code=404, detail="Post not found")
-
-            existing_result = await session.execute(
-                select(PostLike).where(PostLike.post_id == post_id, PostLike.user_id == user_id)
-            )
-            existing_like = existing_result.scalars().first()
-            if existing_like:
-                try:
-                    await record_post_like(post_id, post.user_id, user_id)
-                except Exception:
-                    pass
-                return existing_like
-
-            new_like = PostLike(post_id=post_id, user_id=user_id, is_liked=True)
-            session.add(new_like)
-            await session.commit()
-            await session.refresh(new_like)
-            try:
-                await record_post_like(post_id, post.user_id, user_id)
-            except Exception:
-                pass
-            return new_like
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Internal server error")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
-
-
-async def unlike_post(post_id: int, user_id: int):
-    async with get_session() as session:
-        try:
-            result = await session.execute(select(PostLike).where(PostLike.post_id == post_id, PostLike.user_id == user_id))
-            like = result.scalars().first()
-            mongo_deleted = False
-            try:
-                mongo_deleted = await remove_post_like(post_id, user_id)
-            except Exception:
-                pass
-            if like:
-                await session.delete(like)
-                await session.commit()
-                return True
-            return mongo_deleted
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Internal server error")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
-
-
-async def get_post_likes(post_id: int):
-    return await get_post_like_details(post_id)
 
 
 async def add_post_media(post_id: int, media_url: str, media_type: str, order_index: int):

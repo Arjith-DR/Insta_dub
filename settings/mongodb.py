@@ -6,7 +6,7 @@ from settings.config import settings
 
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
-except ImportError:  # pragma: no cover - gives a clear runtime error if dependency is missing.
+except ImportError:  
     AsyncIOMotorClient = None
 
 

@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime 
 
 class ReelCreate(BaseModel):
     user_id: int
@@ -32,10 +33,8 @@ class ReelCommentOut(BaseModel):
         from_attributes = True
 
 class ReelLikeOut(BaseModel):
-    like_id: int
-    reel_id: int
-    user_id: int
-    is_liked: bool
-
-    class Config:
-        from_attributes = True
+    content_type: str             
+    content_id: str                
+    content_owner_user_id: int  
+    liked_by_user_id: int         
+    liked_at: datetime 

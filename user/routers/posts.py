@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from base_crud import dispatch
-from user.schemas import PostCreate, PostOut, PostCommentCreate, PostCommentOut, PostLikeOut, PostMediaCreate, PostMediaOut
-from user.crud.posts import get_post_likes
+from user.schemas import PostCreate, PostOut, PostCommentCreate, PostCommentOut, PostMediaCreate, PostMediaOut,PostLikeOut
+from user.crud.mongo_likes import record_post_like, remove_post_like, get_post_like_details
 
 posts_router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -40,19 +40,19 @@ async def delete_post_comment(comment_id: int):
     return {"detail": "Comment deleted"}
 
 @posts_router.post("/{post_id}/likes", response_model=PostLikeOut)
-async def like_post(post_id: int, user_id: int):
-    return await dispatch("post", "like", post_id, user_id)
+async def like_post(post_id: int, user_id: int, owner_id: int):
+    return await record_post_like(post_id, owner_id, user_id)
 
-@posts_router.get("/{post_id}/likes/details")
+@posts_router.get("/{post_id}/likes/details", response_model=list[PostLikeOut])
 async def list_post_like_details(post_id: int):
-    return await get_post_likes(post_id)
+    return await get_post_like_details(post_id)
 
 @posts_router.delete("/{post_id}/likes/{user_id}")
 async def unlike_post(post_id: int, user_id: int):
-    deleted = await dispatch("post", "unlike", post_id, user_id)
+    deleted = await remove_post_like(post_id, user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Like not found")
-    return {"detail": "Like removed"}
+    return {"deleted": True}
 
 @posts_router.post("/{post_id}/media", response_model=PostMediaOut)
 async def add_post_media(post_id: int, media: PostMediaCreate):

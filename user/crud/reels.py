@@ -3,8 +3,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_, delete
 from fastapi import HTTPException
 from settings.database import get_session
-from models import Reel, ReelComment, ReelLike, Privacy, Follower
-from user.crud.mongo_likes import record_reel_like, remove_reel_like, get_reel_like_details
+from models import Reel, ReelComment, Privacy, Follower
+from user.crud.mongo_likes import remove_reel_likes_for_reel
 
 
 async def create_reel(user_id: int, video_url: str, caption: str, status="active"):
@@ -59,7 +59,7 @@ async def update_reel(reel_id: int, new_caption: str):
                 reel.caption = new_caption
                 await session.commit()
                 return reel
-            return None
+            raise HTTPException(status_code=404, detail="Reel not found")
         except SQLAlchemyError:
             raise HTTPException(status_code=500, detail="Internal server error")
         except Exception:
@@ -71,7 +71,7 @@ async def delete_reel(reel_id: int):
         try:
             reel = await session.get(Reel, reel_id)
             if reel:
-                await session.execute(delete(ReelLike).where(ReelLike.reel_id == reel_id))
+                await remove_reel_likes_for_reel(reel_id)
                 await session.execute(delete(ReelComment).where(ReelComment.reel_id == reel_id))
                 await session.delete(reel)
                 await session.commit()
@@ -112,65 +112,4 @@ async def delete_reel_comment(comment_id: int):
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
-async def like_reel(reel_id: int, user_id: int):
-    async with get_session() as session:
-        try:
-            reel = await session.get(Reel, reel_id)
-            if not reel:
-                raise HTTPException(status_code=404, detail="Reel not found")
 
-            existing_result = await session.execute(
-                select(ReelLike).where(ReelLike.reel_id == reel_id, ReelLike.user_id == user_id)
-            )
-            existing_like = existing_result.scalars().first()
-            if existing_like:
-                try:
-                    await record_reel_like(reel_id, reel.user_id, user_id)
-                except Exception:
-                    pass
-                return existing_like
-
-            new_like = ReelLike(reel_id=reel_id, user_id=user_id, is_liked=True)
-            session.add(new_like)
-            await session.commit()
-            await session.refresh(new_like)
-            try:
-                await record_reel_like(reel_id, reel.user_id, user_id)
-            except Exception:
-                pass
-            return new_like
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Internal server error")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
-
-
-async def unlike_reel(reel_id: int, user_id: int):
-    async with get_session() as session:
-        try:
-            result = await session.execute(
-                select(ReelLike).where(ReelLike.reel_id == reel_id, ReelLike.user_id == user_id)
-            )
-            like = result.scalars().first()
-            mongo_deleted = False
-            try:
-                mongo_deleted = await remove_reel_like(reel_id, user_id)
-            except Exception:
-                pass
-            if like:
-                await session.delete(like)
-                await session.commit()
-                return True
-            return mongo_deleted
-        except SQLAlchemyError:
-            raise HTTPException(status_code=500, detail="Internal server error")
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
-
-
-async def get_reel_likes(reel_id: int):
-    return await get_reel_like_details(reel_id)
