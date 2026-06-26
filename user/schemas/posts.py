@@ -11,6 +11,7 @@ class PostOut(BaseModel):
     user_id: int
     caption: str
     status: str
+    likes: int = 0
 
     class Config:
         from_attributes = True
@@ -30,12 +31,13 @@ class PostCommentOut(BaseModel):
         from_attributes = True
 
 class PostLikeOut(BaseModel):
-    content_type: str                
-    content_id: str                  
-    content_owner_user_id: int       
-    liked_by_user_id: int            
-    liked_at: datetime
- 
+    content_type: Optional[str] = None
+    post_id: Optional[int] = None
+    content_owner_user_id: Optional[int] = None
+    liked_by_user_id: Optional[int] = None
+    liked_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
 
 class PostMediaCreate(BaseModel):
     post_id: int

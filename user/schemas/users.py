@@ -13,6 +13,7 @@ class UserOut(BaseModel):
     email: EmailStr
     status: str
     created_at: datetime
+    profile_pic: Optional[str] = None
 
     class Config:
         from_attributes = True

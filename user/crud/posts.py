@@ -1,10 +1,12 @@
+import asyncio
+
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_, delete
 from fastapi import HTTPException
 from settings.database import get_session
 from models import Post, PostComment,PostMedia, Privacy, Follower
-from user.crud.mongo_likes import remove_post_likes_for_post
+from user.crud.mongo_likes import remove_post_likes_for_post, count_post_likes
 
 
 
@@ -46,6 +48,11 @@ async def get_posts(requester_id: int):
                     )
                     if follow_result.scalars().first():
                         visible_posts.append(post)
+            
+            # Fetch likes from MongoDB
+            for post in visible_posts:
+                post.likes = await count_post_likes(post.post_id)
+            
             return visible_posts
         except SQLAlchemyError:
             raise HTTPException(status_code=500, detail="Internal server error")
@@ -73,7 +80,10 @@ async def delete_post(post_id: int):
         try:
             post = await session.get(Post, post_id)
             if post:
-                await remove_post_likes_for_post(post_id)
+                try:
+                    await asyncio.wait_for(remove_post_likes_for_post(post_id), timeout=1)
+                except Exception:
+                    pass
                 await session.execute(delete(PostComment).where(PostComment.post_id == post_id))
                 await session.execute(delete(PostMedia).where(PostMedia.post_id == post_id))
                 await session.delete(post)
@@ -140,6 +150,21 @@ async def remove_post_media(media_id: int):
                 await session.commit()
                 return True
             return False
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+
+async def get_posts_by_user(user_id: int):
+    """Fetch all posts for a specific user (used by profile view)."""
+    async with get_session() as session:
+        try:
+            result = await session.execute(select(Post).where(Post.user_id == user_id))
+            posts = result.scalars().all()
+            for post in posts:
+                post.likes = await count_post_likes(post.post_id)
+            return posts
         except SQLAlchemyError:
             raise HTTPException(status_code=500, detail="Internal server error")
         except Exception:

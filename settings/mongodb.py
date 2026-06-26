@@ -22,9 +22,11 @@ def get_mongo_db():
             detail="MongoDB support requires motor. Run: pip install -r requirements.txt",
         )
     if _client is None:
+        import certifi
         _client = AsyncIOMotorClient(
             settings.MONGODB_URL,
             serverSelectionTimeoutMS=settings.MONGODB_TIMEOUT_MS,
+            tlsCAFile=certifi.where()
         )
     return _client[settings.MONGODB_DB_NAME]
 

@@ -2,7 +2,7 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from settings.database import get_session
-from models import User, Username, PasswordChange
+from models import User, Username, PasswordChange, Role, UserRole
 from core.security import hash_password, verify_password
 
 
@@ -12,6 +12,25 @@ async def create_user(role_id, email, password, status="active"):
             hashed_pw = hash_password(password)
             new_user = User(role_id=role_id, email=email, password=hashed_pw, status=status)
             session.add(new_user)
+            await session.flush()
+
+            if role_id is not None:
+                role = await session.get(Role, role_id)
+                if role is None:
+                    role_name = "admin" if int(role_id) == 2 else "user"
+                    role = Role(role_id=role_id, role_name=role_name, description="Auto-created role")
+                    session.add(role)
+                    await session.flush()
+
+                existing_assignment = await session.execute(
+                    select(UserRole).where(
+                        UserRole.user_id == new_user.user_id,
+                        UserRole.role_id == role.role_id,
+                    )
+                )
+                if existing_assignment.scalars().first() is None:
+                    session.add(UserRole(user_id=new_user.user_id, role_id=role.role_id))
+
             await session.commit()
             await session.refresh(new_user)
             return new_user
@@ -120,6 +139,20 @@ async def get_username_by_status(username: str):
         try:
             result = await session.execute(select(Username).where(Username.user_status == username))
             return result.scalars().first()
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+async def update_profile_pic(user_id: int, pic_url: str):
+    async with get_session() as session:
+        try:
+            user = await session.get(User, user_id)
+            if user:
+                user.profile_pic = pic_url
+                await session.commit()
+                return user
+            return None
         except SQLAlchemyError:
             raise HTTPException(status_code=500, detail="Internal server error")
         except Exception:

@@ -14,6 +14,7 @@ class ReelOut(BaseModel):
     video_url: str
     caption: str
     status: str
+    likes: int = 0
 
     class Config:
         from_attributes = True
@@ -33,8 +34,10 @@ class ReelCommentOut(BaseModel):
         from_attributes = True
 
 class ReelLikeOut(BaseModel):
-    content_type: str             
-    content_id: str                
-    content_owner_user_id: int  
-    liked_by_user_id: int         
-    liked_at: datetime 
+    content_type: Optional[str] = None
+    reel_id: Optional[int] = None
+    content_owner_user_id: Optional[int] = None
+    liked_by_user_id: Optional[int] = None
+    liked_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}

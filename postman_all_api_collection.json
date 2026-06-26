@@ -1,0 +1,428 @@
+{
+  "info": {
+    "name": "Insta API - Full Current Collection",
+    "_postman_id": "d4f14f8d-5f83-4cdb-a08e-current-local",
+    "description": "Current API checks for auth, users, bios, privacy, posts, reels, likes/details, followers, and admin routes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8001/api" },
+    { "key": "email", "value": "demo@example.com" },
+    { "key": "password", "value": "password123" },
+    { "key": "newPassword", "value": "password123" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "userId", "value": "3" },
+    { "key": "secondUserId", "value": "1" },
+    { "key": "postId", "value": "" },
+    { "key": "postCommentId", "value": "" },
+    { "key": "postMediaId", "value": "" },
+    { "key": "reelId", "value": "" },
+    { "key": "reelCommentId", "value": "" },
+    { "key": "bioId", "value": "" },
+    { "key": "roleId", "value": "1" },
+    { "key": "overrideId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('accessToken', json.access_token || '');",
+                  "  pm.collectionVariables.set('refreshToken', json.refresh_token || '');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('accessToken', json.access_token || '');",
+                  "  pm.collectionVariables.set('refreshToken', json.refresh_token || '');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" },
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.user_id) pm.collectionVariables.set('userId', json.user_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role_id\": 1,\n  \"email\": \"user{{$timestamp}}@example.com\",\n  \"password\": \"password123\",\n  \"status\": \"active\"\n}" },
+            "url": "{{baseUrl}}/users/"
+          }
+        },
+        { "name": "List Users", "request": { "method": "GET", "url": "{{baseUrl}}/users/" } },
+        { "name": "Get User", "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}" } },
+        { "name": "Get Username", "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}/username" } },
+        {
+          "name": "Change Username",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/users/{{userId}}/username?new_username=postman_user_{{$timestamp}}"
+          }
+        },
+        {
+          "name": "Update Status",
+          "request": { "method": "PUT", "url": "{{baseUrl}}/users/{{userId}}/status?new_status=active" }
+        },
+        {
+          "name": "Update Profile Pic",
+          "request": { "method": "PUT", "url": "{{baseUrl}}/users/{{userId}}/profile_pic?pic_url=https%3A%2F%2Fexample.com%2Favatar.png" }
+        },
+        {
+          "name": "Change Password",
+          "request": { "method": "PUT", "url": "{{baseUrl}}/users/{{userId}}/password?old_password={{password}}&new_password={{newPassword}}" }
+        },
+        {
+          "name": "Log Password Change",
+          "request": { "method": "POST", "url": "{{baseUrl}}/users/{{userId}}/password/log?old_password={{password}}&new_password={{newPassword}}" }
+        },
+        { "name": "Password History", "request": { "method": "GET", "url": "{{baseUrl}}/users/{{userId}}/password/history" } },
+        { "name": "Delete User", "request": { "method": "DELETE", "url": "{{baseUrl}}/users/{{userId}}" } }
+      ]
+    },
+    {
+      "name": "Bios",
+      "item": [
+        {
+          "name": "Create Bio",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.bio_id) pm.collectionVariables.set('bioId', json.bio_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": {{userId}},\n  \"text\": \"Bio created from Postman\",\n  \"current\": true\n}" },
+            "url": "{{baseUrl}}/bios/"
+          }
+        },
+        { "name": "Update Bio", "request": { "method": "PUT", "url": "{{baseUrl}}/bios/{{bioId}}?new_text=Updated%20bio%20from%20Postman" } },
+        { "name": "Delete Bio", "request": { "method": "DELETE", "url": "{{baseUrl}}/bios/{{bioId}}" } }
+      ]
+    },
+    {
+      "name": "Privacy",
+      "item": [
+        { "name": "Get Privacy", "request": { "method": "GET", "url": "{{baseUrl}}/privacy/{{userId}}" } },
+        { "name": "Update Privacy Public", "request": { "method": "PUT", "url": "{{baseUrl}}/privacy/{{userId}}?priv_status=public" } },
+        { "name": "Update Privacy Private", "request": { "method": "PUT", "url": "{{baseUrl}}/privacy/{{userId}}?priv_status=private" } }
+      ]
+    },
+    {
+      "name": "Posts",
+      "item": [
+        {
+          "name": "Create Post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.post_id) pm.collectionVariables.set('postId', json.post_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": {{userId}},\n  \"caption\": \"Testing a post from Postman.\",\n  \"status\": \"active\"\n}" },
+            "url": "{{baseUrl}}/posts/"
+          }
+        },
+        { "name": "List Posts", "request": { "method": "GET", "url": "{{baseUrl}}/posts/?requester_id={{userId}}" } },
+        { "name": "Get Posts By User", "request": { "method": "GET", "url": "{{baseUrl}}/posts/by_user/{{userId}}" } },
+        { "name": "Update Post", "request": { "method": "PUT", "url": "{{baseUrl}}/posts/{{postId}}?new_caption=Updated%20post%20caption" } },
+        {
+          "name": "Add Post Comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.comment_id) pm.collectionVariables.set('postCommentId', json.comment_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"post_id\": {{postId}},\n  \"user_id\": {{userId}},\n  \"text\": \"Nice post!\"\n}" },
+            "url": "{{baseUrl}}/posts/{{postId}}/comments"
+          }
+        },
+        { "name": "Delete Post Comment", "request": { "method": "DELETE", "url": "{{baseUrl}}/posts/comments/{{postCommentId}}" } },
+        { "name": "Like Post", "request": { "method": "POST", "url": "{{baseUrl}}/posts/{{postId}}/likes?user_id={{userId}}&owner_id={{userId}}" } },
+        { "name": "Get Post Like Details", "request": { "method": "GET", "url": "{{baseUrl}}/posts/{{postId}}/likes/details" } },
+        { "name": "Unlike Post", "request": { "method": "DELETE", "url": "{{baseUrl}}/posts/{{postId}}/likes/{{userId}}" } },
+        {
+          "name": "Add Post Media",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.media_id) pm.collectionVariables.set('postMediaId', json.media_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"post_id\": {{postId}},\n  \"media_url\": \"https://images.unsplash.com/photo-1518005020951-eccb494ad742\",\n  \"media_type\": \"image\",\n  \"order_index\": 1\n}" },
+            "url": "{{baseUrl}}/posts/{{postId}}/media"
+          }
+        },
+        { "name": "Remove Post Media", "request": { "method": "DELETE", "url": "{{baseUrl}}/posts/media/{{postMediaId}}" } },
+        { "name": "Delete Post", "request": { "method": "DELETE", "url": "{{baseUrl}}/posts/{{postId}}" } }
+      ]
+    },
+    {
+      "name": "Reels",
+      "item": [
+        {
+          "name": "Create Reel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.reel_id) pm.collectionVariables.set('reelId', json.reel_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": {{userId}},\n  \"video_url\": \"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4\",\n  \"caption\": \"Testing a reel from Postman.\",\n  \"status\": \"active\"\n}" },
+            "url": "{{baseUrl}}/reels/"
+          }
+        },
+        { "name": "List Reels", "request": { "method": "GET", "url": "{{baseUrl}}/reels/?requester_id={{userId}}" } },
+        { "name": "Update Reel", "request": { "method": "PUT", "url": "{{baseUrl}}/reels/{{reelId}}?new_caption=Updated%20reel%20caption" } },
+        {
+          "name": "Add Reel Comment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.comment_id) pm.collectionVariables.set('reelCommentId', json.comment_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reel_id\": {{reelId}},\n  \"user_id\": {{userId}},\n  \"text\": \"Great reel!\"\n}" },
+            "url": "{{baseUrl}}/reels/{{reelId}}/comments"
+          }
+        },
+        { "name": "Delete Reel Comment", "request": { "method": "DELETE", "url": "{{baseUrl}}/reels/comments/{{reelCommentId}}" } },
+        { "name": "Like Reel", "request": { "method": "POST", "url": "{{baseUrl}}/reels/{{reelId}}/likes?user_id={{userId}}&owner_id={{userId}}" } },
+        { "name": "Get Reel Like Details", "request": { "method": "GET", "url": "{{baseUrl}}/reels/{{reelId}}/likes/details" } },
+        { "name": "Unlike Reel", "request": { "method": "DELETE", "url": "{{baseUrl}}/reels/{{reelId}}/likes/{{userId}}" } },
+        { "name": "Delete Reel", "request": { "method": "DELETE", "url": "{{baseUrl}}/reels/{{reelId}}" } }
+      ]
+    },
+    {
+      "name": "Followers",
+      "item": [
+        { "name": "Follow User", "request": { "method": "POST", "url": "{{baseUrl}}/followers/?follower_id={{userId}}&following_id={{secondUserId}}" } },
+        { "name": "Get Followers", "request": { "method": "GET", "url": "{{baseUrl}}/followers/{{userId}}" } },
+        { "name": "Get Following", "request": { "method": "GET", "url": "{{baseUrl}}/followers/following/{{userId}}" } },
+        { "name": "Unfollow User", "request": { "method": "DELETE", "url": "{{baseUrl}}/followers/{{userId}}/{{secondUserId}}" } }
+      ]
+    },
+    {
+      "name": "Admin Users",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+      },
+      "item": [
+        { "name": "List Admin Users", "request": { "method": "GET", "url": "{{baseUrl}}/admin/users/" } },
+        { "name": "Activate User", "request": { "method": "PUT", "url": "{{baseUrl}}/admin/users/{{userId}}/activate" } },
+        { "name": "Deactivate User", "request": { "method": "PUT", "url": "{{baseUrl}}/admin/users/{{userId}}/deactivate" } },
+        {
+          "name": "Admin Reset Password",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"new_password\": \"password123\"\n}" },
+            "url": "{{baseUrl}}/admin/users/{{userId}}/reset-password"
+          }
+        },
+        { "name": "Hard Delete User", "request": { "method": "DELETE", "url": "{{baseUrl}}/admin/users/{{userId}}" } }
+      ]
+    },
+    {
+      "name": "Admin Roles",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Create Role",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.role_id) pm.collectionVariables.set('roleId', json.role_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"role_name\": \"tester_{{$timestamp}}\",\n  \"description\": \"Created from Postman\"\n}" },
+            "url": "{{baseUrl}}/admin/roles/"
+          }
+        },
+        { "name": "List Roles", "request": { "method": "GET", "url": "{{baseUrl}}/admin/roles/" } },
+        {
+          "name": "Assign Role To User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": {{userId}},\n  \"role_id\": {{roleId}}\n}" },
+            "url": "{{baseUrl}}/admin/roles/assign"
+          }
+        },
+        { "name": "List User Roles", "request": { "method": "GET", "url": "{{baseUrl}}/admin/roles/user/{{userId}}" } },
+        {
+          "name": "Remove Role From User",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": {{userId}},\n  \"role_id\": {{roleId}}\n}" },
+            "url": "{{baseUrl}}/admin/roles/remove"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Privacy",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "Override User Privacy",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"policy_value\": \"public\",\n  \"reason\": \"Postman check\"\n}" },
+            "url": "{{baseUrl}}/admin/privacy/user/{{userId}}"
+          }
+        },
+        { "name": "List Privacy Overrides", "request": { "method": "GET", "url": "{{baseUrl}}/admin/privacy/overrides" } },
+        {
+          "name": "Create Global Privacy Policy",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"policy_name\": \"default_visibility_{{$timestamp}}\",\n  \"policy_value\": \"public\"\n}" },
+            "url": "{{baseUrl}}/admin/privacy/global"
+          }
+        },
+        { "name": "List Global Privacy Policies", "request": { "method": "GET", "url": "{{baseUrl}}/admin/privacy/global" } }
+      ]
+    }
+  ]
+}

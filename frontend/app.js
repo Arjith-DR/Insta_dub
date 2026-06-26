@@ -2,6 +2,8 @@ const API_BASE = "/api";
 const TOKEN_KEY = "insta_token";
 const USER_KEY = "insta_user";
 const ADMIN_KEY = "insta_is_admin";
+const LIKED_KEY = "insta_liked";
+const SAVED_KEY = "insta_saved";
 
 const icons = {
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m3 10.5 9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
@@ -17,14 +19,12 @@ const icons = {
   bookmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h12v18l-6-4-6 4V3Z"/></svg>',
   message: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a8.5 8.5 0 0 1-8.5 8.5 9.5 9.5 0 0 1-4.3-1L3 21l1.5-4.4A8.5 8.5 0 1 1 21 12Z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>',
+  "arrow-left": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 6 6 18M6 6l12 12"/></svg>'
 };
-
-const demoUsers = [
-  { user_id: "demo-1", email: "maya.studio@example.com", status: "active" },
-  { user_id: "demo-2", email: "alex.city@example.com", status: "active" },
-  { user_id: "demo-3", email: "nina.frames@example.com", status: "active" }
-];
 
 const demoPosts = [
   { post_id: "demo-post-1", user_id: "demo-1", caption: "Soft light, clean lines, and a tiny corner that finally feels finished.", image_url: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&w=1200&q=80", location: "Design District", likes: 12842, comments: 312 },
@@ -36,6 +36,25 @@ const demoReels = [
   { reel_id: "demo-reel-1", user_id: "demo-1", caption: "Three seconds before the sunset changed everything.", video_url: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4", image_url: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80", location: "Golden hour", likes: 22014, comments: 684 }
 ];
 
+const demoUsers = [
+  { user_id: "demo-1", email: "maya.studio@example.com", status: "active" },
+  { user_id: "demo-2", email: "alex.city@example.com", status: "active" },
+  { user_id: "demo-3", email: "nina.frames@example.com", status: "active" }
+];
+
+function loadSetFromStorage(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSetToStorage(key, set) {
+  localStorage.setItem(key, JSON.stringify([...set]));
+}
+
 const state = {
   token: localStorage.getItem(TOKEN_KEY) || "",
   isAdmin: localStorage.getItem(ADMIN_KEY) === "true",
@@ -46,14 +65,21 @@ const state = {
   view: "posts",
   activeNav: "home",
   usingDemo: false,
-  liked: new Set(),
-  saved: new Set(),
+  liked: loadSetFromStorage(LIKED_KEY),
+  saved: loadSetFromStorage(SAVED_KEY),
   openComments: new Set(),
   commentStore: new Map(),
   selectedPhotoDataUrl: "",
   selectedVideoDataUrl: "",
   adminUsers: [],
-  roles: []
+  following: new Set(),
+  followers: new Set(),
+  roles: [],
+  // user profile view state
+  viewingUserId: null,
+  viewingUserPosts: [],
+  viewingUserReels: [],
+  profileContentTab: "posts",  // "posts" | "reels" within own profile
 };
 
 const els = {
@@ -77,6 +103,16 @@ const els = {
   postPhotoPreview: document.getElementById("postPhotoPreview"),
   reelVideoPreview: document.getElementById("reelVideoPreview")
 };
+
+// ─── User Profile View container (injected into DOM) ────────────────────────
+let userProfileViewEl = document.getElementById("userProfileView");
+if (!userProfileViewEl) {
+  userProfileViewEl = document.createElement("section");
+  userProfileViewEl.className = "page-panel is-hidden";
+  userProfileViewEl.id = "userProfileView";
+  userProfileViewEl.setAttribute("aria-label", "User Profile");
+  els.profileView.parentElement.appendChild(userProfileViewEl);
+}
 
 function icon(name) {
   return icons[name] || "";
@@ -104,6 +140,9 @@ async function api(path, options = {}) {
 }
 
 function usernameFrom(user) {
+  if (!user) return "instagram_user";
+  // prefer the stored username from Username table if available
+  if (user.current_username) return user.current_username;
   const raw = (user?.username || user?.email || `user${user?.user_id || ""}`).split("@")[0];
   return raw.replace(/[^a-zA-Z0-9._]/g, ".").replace(/\.+/g, ".").replace(/^\./, "") || "instagram_user";
 }
@@ -139,9 +178,13 @@ function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(ADMIN_KEY);
+  localStorage.removeItem(LIKED_KEY);
+  localStorage.removeItem(SAVED_KEY);
   state.token = "";
   state.currentUserId = null;
   state.isAdmin = false;
+  state.liked = new Set();
+  state.saved = new Set();
   els.appShell.classList.add("is-hidden");
   els.loginScreen.classList.remove("is-hidden");
 }
@@ -202,8 +245,17 @@ async function quickSignup(event) {
 async function loadUsers() {
   try {
     const users = await api("/users/");
-    state.users = users.length ? users : [...demoUsers];
-    state.usingDemo = !users.length;
+    // Fetch current username for each user
+    const enriched = await Promise.all(users.map(async u => {
+      try {
+        const res = await api(`/users/${u.user_id}/username`);
+        return { ...u, current_username: res.username || null };
+      } catch {
+        return u;
+      }
+    }));
+    state.users = enriched.length ? enriched : [...demoUsers];
+    state.usingDemo = !enriched.length;
   } catch {
     state.users = [...demoUsers];
     state.usingDemo = true;
@@ -211,7 +263,22 @@ async function loadUsers() {
   if (!state.currentUserId && state.users.length) state.currentUserId = state.users[0].user_id;
 }
 
+async function loadFollowers() {
+  if (!state.currentUserId || state.usingDemo) return;
+  try {
+    const [followingList, followersList] = await Promise.all([
+      api(`/followers/following/${state.currentUserId}`),
+      api(`/followers/${state.currentUserId}`)
+    ]);
+    state.following = new Set(followingList.map(f => String(f.following_id)));
+    state.followers = new Set(followersList.map(f => String(f.follower_id)));
+  } catch (e) {
+    console.error("Failed to load followers", e);
+  }
+}
+
 async function loadFeed() {
+  await loadFollowers();
   try {
     const requesterId = Number(state.currentUserId) || 1;
     const [posts, reels] = await Promise.all([
@@ -250,17 +317,7 @@ function enrichReels(reels) {
   }));
 }
 
-function renderStories() {
-  els.storiesStrip.innerHTML = state.users.map((user) => {
-    const username = usernameFrom(user);
-    return `
-      <button class="story-button" type="button">
-        <span class="story-ring"><span class="story-avatar">${escapeHtml(initialsFrom(username))}</span></span>
-        <span>${escapeHtml(username)}</span>
-      </button>
-    `;
-  }).join("");
-}
+// ─── Feed rendering (no stories strip, no delete in actions) ────────────────
 
 function renderFeed() {
   const items = state.view === "reels" ? state.reels : state.posts;
@@ -279,20 +336,27 @@ function renderPost(post, index) {
   const comments = commentsFor("post", id);
   const isOpen = state.openComments.has(key);
   const commentCount = visibleCommentCount("post", post);
+  const isOwn = String(post.user_id) === String(state.currentUserId);
   return `
     <article class="post-card">
       <header class="post-header">
         <div class="post-author">
-          <span class="author-avatar">${escapeHtml(initialsFrom(username))}</span>
-          <div class="author-meta"><strong>${escapeHtml(username)}</strong><span>${escapeHtml(post.location)}</span></div>
+          <button class="author-avatar-btn" data-visit-user="${escapeHtml(post.user_id)}" type="button" title="Visit profile">
+            <span class="author-avatar">${escapeHtml(initialsFrom(username))}</span>
+          </button>
+          <div class="author-meta">
+            <button class="username-link" data-visit-user="${escapeHtml(post.user_id)}" type="button"><strong>${escapeHtml(username)}</strong></button>
+            <span>${escapeHtml(post.location || "Instagram")}</span>
+          </div>
         </div>
+        ${!isOwn ? `<button class="text-button" data-follow="${escapeHtml(post.user_id)}" type="button">${state.following.has(String(post.user_id)) ? "Following" : "Follow"}</button>` : ""}
         <button class="icon-button" type="button" title="More">${icon("more")}</button>
       </header>
       <div class="media-frame"><img src="${escapeHtml(post.image_url)}" alt="${escapeHtml(post.caption || "Post")}" loading="lazy" /></div>
-      ${renderActions("post", id)}
+      ${renderFeedActions("post", id, post.user_id)}
       <div class="post-body">
         <div class="likes">${formatCount(post.likes + (state.liked.has(String(id)) ? 1 : 0))} likes</div>
-        <p class="caption"><strong>${escapeHtml(username)}</strong>${escapeHtml(post.caption || "New post")}</p>
+        <p class="caption"><button class="username-link" data-visit-user="${escapeHtml(post.user_id)}" type="button"><strong>${escapeHtml(username)}</strong></button>${escapeHtml(post.caption || "New post")}</p>
         <button class="comments-link" data-toggle-comments="${escapeHtml(key)}" type="button">${isOpen ? "Hide" : "View all"} ${formatCount(commentCount)} comments</button>
         ${isOpen ? renderCommentList(comments) : ""}
         <button class="time-link" type="button">Just now</button>
@@ -313,20 +377,27 @@ function renderReel(reel, index) {
   const comments = commentsFor("reel", id);
   const isOpen = state.openComments.has(key);
   const commentCount = visibleCommentCount("reel", reel);
+  const isOwn = String(reel.user_id) === String(state.currentUserId);
   return `
     <article class="reel-card">
       <header class="reel-header">
         <div class="post-author">
-          <span class="author-avatar">${escapeHtml(initialsFrom(username))}</span>
-          <div class="author-meta"><strong>${escapeHtml(username)}</strong><span>${escapeHtml(reel.location)}</span></div>
+          <button class="author-avatar-btn" data-visit-user="${escapeHtml(reel.user_id)}" type="button" title="Visit profile">
+            <span class="author-avatar">${escapeHtml(initialsFrom(username))}</span>
+          </button>
+          <div class="author-meta">
+            <button class="username-link" data-visit-user="${escapeHtml(reel.user_id)}" type="button"><strong>${escapeHtml(username)}</strong></button>
+            <span>${escapeHtml(reel.location || "Reels")}</span>
+          </div>
         </div>
+        ${!isOwn ? `<button class="text-button" data-follow="${escapeHtml(reel.user_id)}" type="button">${state.following.has(String(reel.user_id)) ? "Following" : "Follow"}</button>` : ""}
         <button class="icon-button" type="button" title="More">${icon("more")}</button>
       </header>
       <div class="media-frame wide"><video src="${escapeHtml(reel.video_url)}" poster="${escapeHtml(reel.image_url)}" controls muted playsinline preload="metadata"></video></div>
-      ${renderActions("reel", id)}
+      ${renderFeedActions("reel", id, reel.user_id)}
       <div class="post-body">
         <div class="likes">${formatCount(reel.likes + (state.liked.has(String(id)) ? 1 : 0))} likes</div>
-        <p class="caption"><strong>${escapeHtml(username)}</strong>${escapeHtml(reel.caption || "New reel")}</p>
+        <p class="caption"><button class="username-link" data-visit-user="${escapeHtml(reel.user_id)}" type="button"><strong>${escapeHtml(username)}</strong></button>${escapeHtml(reel.caption || "New reel")}</p>
         <button class="comments-link" data-toggle-comments="${escapeHtml(key)}" type="button">${isOpen ? "Hide" : "View all"} ${formatCount(commentCount)} comments</button>
         ${isOpen ? renderCommentList(comments) : ""}
         <button class="time-link" type="button">Just now</button>
@@ -339,18 +410,17 @@ function renderReel(reel, index) {
   `;
 }
 
-function renderActions(type, id) {
+// Feed actions: like, comment, save. NO delete button in feed.
+function renderFeedActions(type, id, ownerId) {
   const key = String(id);
   const savedKey = itemKey(type, id);
-  const canDelete = state.isAdmin && Number.isInteger(Number(id));
   return `
     <div class="post-actions">
       <div class="action-group">
-        <button class="icon-button ${state.liked.has(key) ? "liked" : ""}" data-like="${escapeHtml(id)}" data-type="${type}" type="button" title="Like">${icon("heart")}</button>
+        <button class="icon-button ${state.liked.has(key) ? "liked" : ""}" data-like="${escapeHtml(id)}" data-like-owner="${escapeHtml(ownerId)}" data-type="${type}" type="button" title="Like">${icon("heart")}</button>
         <button class="icon-button" type="button" title="Comment">${icon("message")}</button>
       </div>
       <div class="action-group">
-        ${canDelete ? `<button class="icon-button" data-delete="${escapeHtml(id)}" data-type="${type}" type="button" title="Delete">${icon("trash")}</button>` : ""}
         <button class="icon-button ${state.saved.has(savedKey) ? "active" : ""}" data-save="${escapeHtml(id)}" data-type="${type}" type="button" title="Save">${icon("bookmark")}</button>
       </div>
     </div>
@@ -363,57 +433,257 @@ function renderCommentList(comments) {
   }
   return `
     <div class="comment-list">
-      ${comments.map((comment) => `<p><strong>${escapeHtml(comment.username)}</strong>${escapeHtml(comment.text)}</p>`).join("")}
+      ${comments.map((comment) => `<p><strong>${escapeHtml(comment.username)}</strong> ${escapeHtml(comment.text)}</p>`).join("")}
     </div>
   `;
 }
 
-function renderProfile() {
+// ─── Profile Page ────────────────────────────────────────────────────────────
+
+async function renderProfile() {
   const user = currentUser();
   const username = usernameFrom(user);
   const initials = initialsFrom(username);
   document.querySelectorAll("#navAvatar, #bottomAvatar, #mobileNavAvatar").forEach((avatar) => {
     avatar.textContent = initials;
   });
+
+  const myPosts = state.posts.filter((post) => String(post.user_id) === String(user.user_id));
+  const myReels = state.reels.filter((reel) => String(reel.user_id) === String(user.user_id));
+  const tab = state.profileContentTab;
+
+  let bioText = "";
+  let privStatus = "public";
+  try {
+    const [bioResp, privResp] = await Promise.all([
+      api(`/bios/${state.currentUserId}`),
+      api(`/privacy/${state.currentUserId}`)
+    ]);
+    bioText = bioResp?.b_txt || "";
+    privStatus = privResp?.priv_status || "public";
+  } catch (e) {
+    console.error("Failed to fetch bio/privacy", e);
+  }
+
   els.profileView.innerHTML = `
     <div class="profile-page">
+      <!-- Hero section -->
       <section class="profile-hero">
-        <span class="account-avatar large">${escapeHtml(initials)}</span>
+        <label class="account-avatar large" style="cursor:pointer;" title="Change Profile Photo">
+          ${user.profile_pic ? `<img src="${escapeHtml(user.profile_pic)}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />` : escapeHtml(initials)}
+          <input type="file" id="profilePhotoUpload" accept="image/*" style="display:none;" />
+        </label>
         <div>
           <h2>${escapeHtml(username)}</h2>
           <p>${escapeHtml(user.email || "No email available")}</p>
-          <p class="profile-bio">Bio: Building moments, posts, and reels in this Instagram-style app.</p>
+          ${bioText ? `<p><strong>Bio:</strong> ${escapeHtml(bioText)}</p>` : ""}
+          <p class="status-message">Account status: <strong>${escapeHtml(privStatus.toUpperCase())}</strong></p>
           <div class="profile-stats">
-            <span><strong>${state.posts.filter((post) => String(post.user_id) === String(user.user_id)).length}</strong> posts</span>
-            <span><strong>${state.reels.filter((reel) => String(reel.user_id) === String(user.user_id)).length}</strong> reels</span>
-            <span><strong>${user.status || "active"}</strong> status</span>
+            <span><strong>${myPosts.length}</strong> posts</span>
+            <span><strong>${myReels.length}</strong> reels</span>
+            <span><strong>${state.followers.size}</strong> followers</span>
+            <span><strong>${state.following.size}</strong> following</span>
           </div>
         </div>
       </section>
 
       <section class="profile-grid">
+        <!-- Profile Settings -->
         <div class="tool-panel">
-          <div class="section-title"><span>Switch account</span><button class="text-button" id="profileSwitchButton" type="button">Use</button></div>
-          <select id="profileUserSelect">${state.users.map((item) => `<option value="${escapeHtml(item.user_id)}" ${String(item.user_id) === String(state.currentUserId) ? "selected" : ""}>${escapeHtml(usernameFrom(item))} (${escapeHtml(item.email || item.user_id)})</option>`).join("")}</select>
-        </div>
-
-        <div class="tool-panel">
-          <div class="section-title"><span>Create account</span></div>
-          <form id="profileCreateUserForm" class="stacked-form">
-            <input id="profileNewUserEmail" type="email" placeholder="Email" required />
-            <input id="profileNewUserPassword" type="password" placeholder="Password" required />
-            <button class="primary-button" type="submit">Create account</button>
+          <div class="section-title"><span>Profile Settings</span></div>
+          <form id="updateProfileForm" class="stacked-form">
+            <input id="profileUpdateUsername" type="text" placeholder="New username" />
+            <input id="profileUpdateBio" type="text" placeholder="Update bio" />
+            <select id="profileUpdatePrivacy">
+               <option value="public">Public</option>
+               <option value="private">Private</option>
+            </select>
+            <button class="primary-button" type="submit">Update Profile</button>
           </form>
         </div>
 
+        <!-- Switch Account + Create New Account -->
         <div class="tool-panel">
-          <div class="section-title"><span>Create content</span></div>
-          <button class="primary-button" id="profileOpenCreate" type="button">Create post or reel</button>
+          <div class="section-title"><span>Switch Account</span><button class="text-button" id="profileSwitchButton" type="button">Use</button></div>
+          <select id="profileUserSelect">${state.users.map((item) => `<option value="${escapeHtml(item.user_id)}" ${String(item.user_id) === String(state.currentUserId) ? "selected" : ""}>${escapeHtml(usernameFrom(item))} (${escapeHtml(item.email || item.user_id)})</option>`).join("")}</select>
+
+          <div class="section-title" style="margin-top: 18px;"><span>Create New Account</span></div>
+          <form id="profileCreateUserForm" class="stacked-form">
+            <input id="profileNewUserEmail" type="email" placeholder="New account email" required />
+            <input id="profileNewUserPassword" type="password" placeholder="New account password" required />
+            <button class="secondary-action" type="submit">Create Account</button>
+          </form>
+        </div>
+
+        <!-- Your Content (Posts & Reels) with tabs -->
+        <div class="tool-panel" style="grid-column: 1 / -1;">
+          <div class="section-title">
+            <span>Your Content</span>
+            <button class="text-button" id="profileOpenCreate" type="button">+ Create</button>
+          </div>
+          <div class="feed-switch" role="tablist">
+            <button class="switch-button ${tab === "posts" ? "active" : ""}" data-profile-tab="posts" type="button">Posts</button>
+            <button class="switch-button ${tab === "reels" ? "active" : ""}" data-profile-tab="reels" type="button">Reels</button>
+          </div>
+          ${tab === "posts" ? renderProfileContentGrid(myPosts, "post") : renderProfileContentGrid(myReels, "reel")}
         </div>
       </section>
     </div>
   `;
 }
+
+function renderProfileContentGrid(items, type) {
+  if (!items.length) {
+    return `<div class="empty-state">${icon(type === "reel" ? "film" : "image")}<h2>No ${type}s yet.</h2><p>Hit + Create to add one.</p></div>`;
+  }
+  return `
+    <div class="saved-grid">
+      ${items.map(item => {
+        const id = item.post_id || item.reel_id;
+        return `
+          <article class="saved-tile">
+            <div class="saved-media">
+              ${type === "reel"
+                ? `<video src="${escapeHtml(item.video_url)}" muted playsinline></video>`
+                : `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.caption || "Post")}" loading="lazy" />`}
+            </div>
+            <div>
+              <p><strong>${type === "reel" ? "Reel" : "Post"}</strong></p>
+              <p>${escapeHtml(item.caption || "No caption")}</p>
+              <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                <button class="secondary-action" data-edit="${escapeHtml(id)}" data-type="${type}" data-caption="${escapeHtml(item.caption || "")}" type="button" style="padding: 4px 8px; font-size: 12px; min-height: 28px;">Edit Caption</button>
+                <button class="secondary-action danger" data-delete="${escapeHtml(id)}" data-type="${type}" type="button" style="padding: 4px 8px; font-size: 12px; min-height: 28px;">Delete</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+// ─── User Profile View (when clicking another user's name) ───────────────────
+
+async function showUserProfile(userId) {
+  userId = String(userId);
+  const isOwn = userId === String(state.currentUserId);
+
+  // If own profile, just go to profile nav
+  if (isOwn) {
+    setNav("profile");
+    return;
+  }
+
+  state.viewingUserId = userId;
+  userProfileViewEl.classList.remove("is-hidden");
+  [els.feedView, els.profileView, els.savedView, els.adminView].forEach(v => v.classList.add("is-hidden"));
+
+  // Update nav highlight
+  document.querySelectorAll("[data-nav]").forEach(b => b.classList.remove("active"));
+
+  userProfileViewEl.innerHTML = `<div class="loading-state">${icon("compass")}<p>Loading profile…</p></div>`;
+
+  try {
+    const [userPosts, userReels] = await Promise.all([
+      api(`/posts/by_user/${userId}`),
+      api(`/reels/by_user/${userId}`)
+    ]);
+    state.viewingUserPosts = enrichPosts(userPosts);
+    state.viewingUserReels = enrichReels(userReels);
+  } catch {
+    state.viewingUserPosts = state.posts.filter(p => String(p.user_id) === userId);
+    state.viewingUserReels = state.reels.filter(r => String(r.user_id) === userId);
+  }
+
+  const targetUser = userById(userId);
+  const username = usernameFrom(targetUser || { user_id: userId });
+  const initials = initialsFrom(username);
+  const isFollowing = state.following.has(userId);
+
+  let isPrivate = false;
+  let bioText = "";
+  try {
+    const [privResp, bioResp] = await Promise.all([
+      api(`/privacy/${userId}`),
+      api(`/bios/${userId}`)
+    ]);
+    isPrivate = privResp?.priv_status === "private";
+    bioText = bioResp?.b_txt || "";
+  } catch {}
+
+  const canSeeContent = !isPrivate || isFollowing;
+
+  userProfileViewEl.innerHTML = `
+    <div class="user-profile-page">
+      <div class="user-profile-back">
+        <button class="icon-button" id="backFromUserProfile" type="button">${icon("arrow-left")} <span>Back</span></button>
+      </div>
+      <section class="profile-hero">
+        <span class="account-avatar large">${escapeHtml(initials)}</span>
+        <div>
+          <h2>${escapeHtml(username)}</h2>
+          <p>${escapeHtml(targetUser?.email || "")}</p>
+          ${bioText ? `<p><strong>Bio:</strong> ${escapeHtml(bioText)}</p>` : ""}
+          <p class="status-message">Account status: <strong>${escapeHtml(isPrivate ? "PRIVATE" : "PUBLIC")}</strong></p>
+          <div class="profile-stats">
+            <span><strong>${state.viewingUserPosts.length}</strong> posts</span>
+            <span><strong>${state.viewingUserReels.length}</strong> reels</span>
+          </div>
+          <div style="margin-top: 12px;">
+            <button class="primary-button" data-follow="${escapeHtml(userId)}" type="button" style="min-width:120px;">
+              ${isFollowing ? "Following" : "Follow"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      ${isPrivate && !isFollowing ? `
+        <div class="private-account-notice">
+          <span>${icon("lock")}</span>
+          <h3>This Account is Private</h3>
+          <p>Follow this account to see their photos and videos.</p>
+        </div>
+      ` : `
+        <div class="tool-panel" style="margin-top:16px;">
+          <div class="feed-switch" role="tablist">
+            <button class="switch-button active" data-user-profile-tab="posts" type="button">Posts</button>
+            <button class="switch-button" data-user-profile-tab="reels" type="button">Reels</button>
+          </div>
+          <div id="userProfileContent">
+            ${renderUserProfileGrid(state.viewingUserPosts, "post")}
+          </div>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderUserProfileGrid(items, type) {
+  if (!items.length) {
+    return `<div class="empty-state">${icon(type === "reel" ? "film" : "image")}<h2>No ${type}s yet.</h2></div>`;
+  }
+  return `
+    <div class="saved-grid">
+      ${items.map(item => {
+        return `
+          <article class="saved-tile">
+            <div class="saved-media">
+              ${type === "reel"
+                ? `<video src="${escapeHtml(item.video_url)}" muted playsinline></video>`
+                : `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.caption || "Post")}" loading="lazy" />`}
+            </div>
+            <div>
+              <p><strong>${type === "reel" ? "Reel" : "Post"}</strong></p>
+              <p>${escapeHtml(item.caption || "No caption")}</p>
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
 
 async function renderAdmin() {
   if (!state.isAdmin) {
@@ -449,7 +719,7 @@ async function renderAdmin() {
         </div>
         <div class="tool-panel">
           <div class="section-title"><span>Content moderation</span></div>
-          <p class="muted-copy">Admin delete buttons are visible on real posts and reels in the feed.</p>
+          <p class="muted-copy">Review and manage all posts and reels from the feed.</p>
           <button class="primary-button" data-nav="posts" type="button">Review posts</button>
           <button class="secondary-action" data-nav="reels" type="button">Review reels</button>
         </div>
@@ -480,7 +750,7 @@ function renderSaved() {
     <div class="saved-page">
       <section class="admin-header">
         <h2>Saved</h2>
-        <p>Your saved posts and reels for the current session.</p>
+        <p>Your saved posts and reels.</p>
       </section>
       <div class="saved-grid">
         ${savedItems.map(({ type, item }) => `
@@ -527,6 +797,8 @@ function findSavedItem(key) {
 function setNav(nav) {
   state.activeNav = nav;
   document.querySelectorAll("[data-nav]").forEach((button) => button.classList.toggle("active", button.dataset.nav === nav));
+  // Hide user profile view whenever navigating away
+  userProfileViewEl.classList.add("is-hidden");
   els.feedView.classList.toggle("is-hidden", !["home", "posts", "reels"].includes(nav));
   els.profileView.classList.toggle("is-hidden", nav !== "profile");
   els.savedView.classList.toggle("is-hidden", nav !== "saved");
@@ -577,8 +849,6 @@ async function createUser(email, password) {
     body: JSON.stringify({ role_id: 1, email, password, status: "active" })
   });
   state.users.unshift(user);
-  state.currentUserId = user.user_id;
-  localStorage.setItem(USER_KEY, user.user_id);
   return user;
 }
 
@@ -613,7 +883,7 @@ async function createPost(event) {
   els.createPostForm.reset();
   resetPhotoPreview();
   closeCreate();
-  setNav("posts");
+  setNav("profile");
 }
 
 async function createReel(event) {
@@ -639,7 +909,7 @@ async function createReel(event) {
   els.createReelForm.reset();
   resetVideoPreview();
   closeCreate();
-  setNav("reels");
+  setNav("profile");
 }
 
 function resetPhotoPreview() {
@@ -653,11 +923,13 @@ function resetVideoPreview() {
 }
 
 async function deleteItem(type, id) {
+  if (!confirm(`Delete this ${type}?`)) return;
   try {
     await api(type === "reel" ? `/reels/${id}` : `/posts/${id}`, { method: "DELETE" });
     if (type === "reel") state.reels = state.reels.filter((item) => String(item.reel_id) !== String(id));
     else state.posts = state.posts.filter((item) => String(item.post_id) !== String(id));
     renderFeed();
+    renderProfile();
     showToast("Deleted.");
   } catch (error) {
     showToast(error.message);
@@ -667,20 +939,52 @@ async function deleteItem(type, id) {
 async function toggleLike(button) {
   const key = String(button.dataset.like);
   const type = button.dataset.type;
+  const ownerId = Number(button.dataset.likeOwner) || 0;
   const wasLiked = state.liked.has(key);
   const userId = Number(state.currentUserId);
   const itemId = Number(key);
+
   if (Number.isInteger(userId) && Number.isInteger(itemId)) {
     const base = type === "reel" ? `/reels/${itemId}/likes` : `/posts/${itemId}/likes`;
     try {
-      await api(wasLiked ? `${base}/${userId}` : `${base}?user_id=${userId}`, { method: wasLiked ? "DELETE" : "POST" });
+      if (wasLiked) {
+        await api(`${base}/${userId}`, { method: "DELETE" });
+      } else {
+        await api(`${base}?user_id=${userId}&owner_id=${ownerId}`, { method: "POST" });
+      }
     } catch (error) {
       showToast(error.message);
       return;
     }
   }
   wasLiked ? state.liked.delete(key) : state.liked.add(key);
+  saveSetToStorage(LIKED_KEY, state.liked);
   renderFeed();
+}
+
+async function toggleFollow(targetUserId) {
+  targetUserId = String(targetUserId);
+  const isFollowing = state.following.has(targetUserId);
+  const currentUserId = Number(state.currentUserId);
+  if (!Number.isInteger(currentUserId)) return;
+
+  try {
+    if (isFollowing) {
+      await api(`/followers/${currentUserId}/${targetUserId}`, { method: "DELETE" });
+      state.following.delete(targetUserId);
+    } else {
+      await api(`/followers/?follower_id=${currentUserId}&following_id=${targetUserId}`, { method: "POST" });
+      state.following.add(targetUserId);
+    }
+    renderFeed();
+    if (state.activeNav === "profile") renderProfile();
+    // Refresh user profile view if open
+    if (!userProfileViewEl.classList.contains("is-hidden") && state.viewingUserId === targetUserId) {
+      showUserProfile(targetUserId);
+    }
+  } catch (e) {
+    showToast(e.message);
+  }
 }
 
 async function submitComment(form) {
@@ -714,39 +1018,131 @@ async function bootApp() {
   els.loginScreen.classList.add("is-hidden");
   els.appShell.classList.remove("is-hidden");
   els.adminNavItem.classList.toggle("is-hidden", !state.isAdmin);
+  // Hide stories strip — we don't use it
+  if (els.storiesStrip) els.storiesStrip.style.display = "none";
   await loadUsers();
   await loadFeed();
-  renderStories();
   renderFeed();
   renderProfile();
   hydrateIcons();
   setNav(state.isAdmin ? "admin" : "home");
 }
 
+// ─── Event delegation ────────────────────────────────────────────────────────
+
 document.addEventListener("click", async (event) => {
+  // Navigation
   const navButton = event.target.closest("[data-nav]");
   if (navButton) setNav(navButton.dataset.nav);
+
   if (event.target.closest("#logoutButton, #mobileLogoutButton")) logout();
   if (event.target.closest("#profileOpenCreate")) openCreate();
   if (event.target.closest("#closeCreateModal")) closeCreate();
   if (event.target.closest("[data-view-button]")) setView(event.target.closest("[data-view-button]").dataset.viewButton);
+
+  // Profile content tabs
+  const profileTab = event.target.closest("[data-profile-tab]");
+  if (profileTab) {
+    state.profileContentTab = profileTab.dataset.profileTab;
+    renderProfile();
+    return;
+  }
+
+  // User profile tab (within another user's profile view)
+  const userProfileTab = event.target.closest("[data-user-profile-tab]");
+  if (userProfileTab) {
+    const tab = userProfileTab.dataset.userProfileTab;
+    document.querySelectorAll("[data-user-profile-tab]").forEach(b => b.classList.toggle("active", b === userProfileTab));
+    const contentEl = document.getElementById("userProfileContent");
+    if (contentEl) {
+      contentEl.innerHTML = tab === "reels"
+        ? renderUserProfileGrid(state.viewingUserReels, "reel")
+        : renderUserProfileGrid(state.viewingUserPosts, "post");
+      hydrateIcons(contentEl);
+    }
+    return;
+  }
+
+  // Visit user profile when clicking username/avatar
+  const visitBtn = event.target.closest("[data-visit-user]");
+  if (visitBtn) {
+    await showUserProfile(visitBtn.dataset.visitUser);
+    hydrateIcons(userProfileViewEl);
+    return;
+  }
+
+  // Back from user profile view
+  if (event.target.closest("#backFromUserProfile")) {
+    userProfileViewEl.classList.add("is-hidden");
+    state.viewingUserId = null;
+    setNav(state.activeNav === "profile" ? "profile" : "home");
+    return;
+  }
+
+  // Toggle comments
   const commentsButton = event.target.closest("[data-toggle-comments]");
   if (commentsButton) {
     const key = commentsButton.dataset.toggleComments;
     state.openComments.has(key) ? state.openComments.delete(key) : state.openComments.add(key);
     renderFeed();
   }
+
+  // Like
   const likeButton = event.target.closest("[data-like]");
   if (likeButton) toggleLike(likeButton);
+
+  // Save
   const saveButton = event.target.closest("[data-save]");
   if (saveButton) {
     const key = itemKey(saveButton.dataset.type, saveButton.dataset.save);
     state.saved.has(key) ? state.saved.delete(key) : state.saved.add(key);
+    saveSetToStorage(SAVED_KEY, state.saved);
     renderFeed();
     if (state.activeNav === "saved") renderSaved();
   }
+
+  // Follow / Unfollow
+  const followButton = event.target.closest("[data-follow]");
+  if (followButton) toggleFollow(followButton.dataset.follow);
+
+  // Delete (only from profile page, not feed)
   const deleteButton = event.target.closest("[data-delete]");
   if (deleteButton) deleteItem(deleteButton.dataset.type, deleteButton.dataset.delete);
+
+  // Edit (caption)
+  const editButton = event.target.closest("[data-edit]");
+  if (editButton) {
+    const id = editButton.dataset.edit;
+    const type = editButton.dataset.type;
+    const oldCaption = editButton.dataset.caption;
+    const newCaption = prompt("Edit caption:", oldCaption);
+    if (newCaption !== null && newCaption.trim() !== "") {
+      try {
+        await api(`/${type === "reel" ? "reels" : "posts"}/${id}?new_caption=${encodeURIComponent(newCaption)}`, { method: "PUT" });
+        showToast("Updated!");
+        await loadFeed();
+        renderProfile();
+        renderFeed();
+      } catch (e) {
+        showToast(e.message);
+      }
+    }
+  }
+
+  // Profile switch button
+  if (event.target.id === "profileSwitchButton") {
+    const sel = document.getElementById("profileUserSelect");
+    if (sel) {
+      state.currentUserId = sel.value;
+      localStorage.setItem(USER_KEY, state.currentUserId);
+      await loadFeed();
+      renderFeed();
+      renderProfile();
+      showToast("Switched account.");
+    }
+  }
+
+  // Admin
   const adminDeleteUser = event.target.closest("[data-admin-delete-user]");
   if (adminDeleteUser) {
     try {
@@ -765,17 +1161,68 @@ document.addEventListener("submit", async (event) => {
   if (event.target === els.quickSignupForm) quickSignup(event);
   if (event.target === els.createPostForm) createPost(event);
   if (event.target === els.createReelForm) createReel(event);
+
   if (event.target.matches("[data-comment-form]")) {
     event.preventDefault();
     submitComment(event.target);
   }
+
+  // Profile update
+  if (event.target.id === "updateProfileForm") {
+    event.preventDefault();
+    const username = document.getElementById("profileUpdateUsername").value.trim();
+    const bio = document.getElementById("profileUpdateBio").value.trim();
+    const privacy = document.getElementById("profileUpdatePrivacy").value;
+
+    let anySuccess = false;
+    try {
+      if (username) {
+        await api(`/users/${state.currentUserId}/username?new_username=${encodeURIComponent(username)}`, { method: "PUT" });
+        anySuccess = true;
+      }
+    } catch (e) {
+      showToast(`Username update failed: ${e.message}`);
+    }
+
+    try {
+      if (bio) {
+        await api(`/bios/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: Number(state.currentUserId), text: bio, current: true })
+        });
+        anySuccess = true;
+      }
+    } catch (e) {
+      showToast(`Bio update failed: ${e.message}`);
+    }
+
+    try {
+      await api(`/privacy/${state.currentUserId}?priv_status=${privacy}`, { method: "PUT" });
+      anySuccess = true;
+    } catch (e) {
+      showToast(`Privacy update failed: ${e.message}`);
+    }
+
+    if (anySuccess) {
+      showToast("Profile updated!");
+      await loadUsers();
+      renderProfile();
+      renderFeed();
+    }
+  }
+
+  // Create new account from profile
   if (event.target.id === "profileCreateUserForm") {
     event.preventDefault();
+    const email = document.getElementById("profileNewUserEmail").value.trim();
+    const password = document.getElementById("profileNewUserPassword").value;
     try {
-      await createUser(document.getElementById("profileNewUserEmail").value.trim(), document.getElementById("profileNewUserPassword").value);
+      await createUser(email, password);
       event.target.reset();
+      await loadUsers();
       renderProfile();
-      showToast("Account created.");
+      showToast("Account created. Switch to it using the dropdown above.");
     } catch (error) {
       showToast(error.message);
     }
@@ -792,13 +1239,7 @@ document.addEventListener("change", async (event) => {
     els.reelVideoPreview.innerHTML = `<video src="${escapeHtml(state.selectedVideoDataUrl)}" muted playsinline controls></video><strong>Video selected</strong>`;
   }
   if (event.target.id === "profileUserSelect") {
-    state.currentUserId = event.target.value;
-    localStorage.setItem(USER_KEY, state.currentUserId);
-    await loadFeed();
-    renderStories();
-    renderFeed();
-    renderProfile();
-    showToast("Switched account.");
+    // handled by switch button
   }
 });
 
@@ -824,5 +1265,30 @@ async function init() {
     }
   }
 }
+
+document.addEventListener("change", async (event) => {
+  if (event.target.id === "profilePhotoUpload") {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const user = currentUser();
+      const updatedUser = await api(`/users/${user.user_id}/profile_pic`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataUrl)
+      });
+      // update state
+      const idx = state.users.findIndex(u => String(u.user_id) === String(user.user_id));
+      if (idx !== -1) {
+        state.users[idx].profile_pic = dataUrl;
+      }
+      renderProfile();
+      showToast("Profile photo updated.");
+    } catch (e) {
+      showToast(e.message);
+    }
+  }
+});
 
 init();

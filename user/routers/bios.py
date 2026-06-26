@@ -9,6 +9,15 @@ bios_router = APIRouter(prefix="/bios", tags=["bios"])
 async def create_bio(bio: BioCreate):
     return await dispatch("bio", "create", bio.user_id, bio.text, bio.current)
 
+@bios_router.get("/{user_id}")
+async def get_bio(user_id: int):
+    bios = await dispatch("bio", "get_all")
+    for b in bios:
+        if b.user_id == user_id and b.current:
+            return b
+    return {"user_id": user_id, "b_txt": "", "current": True}
+
+
 @bios_router.put("/{bio_id}", response_model=BioOut)
 async def update_bio(bio_id: int, new_text: str):
     updated = await dispatch("bio", "update", bio_id, new_text)

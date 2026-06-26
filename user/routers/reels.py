@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from base_crud import dispatch
 from user.schemas import ReelCreate, ReelOut, ReelCommentCreate, ReelCommentOut, ReelLikeOut
-from user.crud.mongo_likes import record_reel_like, remove_reel_like, get_reel_like_details
+from user.crud.pg_likes import record_reel_like, remove_reel_like, get_reel_like_details
 
 reels_router = APIRouter(prefix="/reels", tags=["reels"])
 
@@ -13,6 +13,10 @@ async def create_reel(reel: ReelCreate):
 @reels_router.get("/", response_model=list[ReelOut])
 async def list_reels(requester_id: int):
     return await dispatch("reel", "get_all", requester_id)
+
+@reels_router.get("/by_user/{user_id}", response_model=list[ReelOut])
+async def get_user_reels(user_id: int):
+    return await dispatch("reel", "get_by_user", user_id)
 
 @reels_router.put("/{reel_id}", response_model=ReelOut)
 async def update_reel(reel_id: int, new_caption: str):
@@ -39,7 +43,8 @@ async def delete_reel_comment(comment_id: int):
         raise HTTPException(status_code=404, detail="Comment not found")
     return {"detail": "Comment deleted"}
 
-async def like_reel(reel_id: int, user_id: int, owner_id: int):
+@reels_router.post("/{reel_id}/likes", response_model=ReelLikeOut)
+async def like_reel(reel_id: int, user_id: int, owner_id: int = 0):
     return await record_reel_like(reel_id, owner_id, user_id)
 
 @reels_router.get("/{reel_id}/likes/details", response_model=list[ReelLikeOut])

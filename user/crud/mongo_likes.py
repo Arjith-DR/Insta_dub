@@ -129,3 +129,18 @@ async def remove_reel_likes_for_reel(reel_id: int):
         return result.deleted_count  # number of likes removed
     except PyMongoError as exc:
         raise HTTPException(status_code=500, detail=f"MongoDB post likes delete failed: {exc}") from exc
+
+async def count_post_likes(post_id: int) -> int:
+    db = get_mongo_db()
+    try:
+        return await db.post_likes.count_documents({"post_id": post_id})
+    except PyMongoError:
+        return 0
+
+async def count_reel_likes(reel_id: int) -> int:
+    db = get_mongo_db()
+    try:
+        return await db.reel_likes.count_documents({"reel_id": reel_id})
+    except PyMongoError:
+        return 0
+

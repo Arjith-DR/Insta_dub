@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from base_crud import dispatch
 from user.schemas import PostCreate, PostOut, PostCommentCreate, PostCommentOut, PostMediaCreate, PostMediaOut,PostLikeOut
-from user.crud.mongo_likes import record_post_like, remove_post_like, get_post_like_details
+from user.crud.pg_likes import record_post_like, remove_post_like, get_post_like_details
 
 posts_router = APIRouter(prefix="/posts", tags=["posts"])
 
@@ -13,6 +13,10 @@ async def create_post(post: PostCreate):
 @posts_router.get("/", response_model=list[PostOut])
 async def list_posts(requester_id: int):
     return await dispatch("post", "get_all", requester_id)
+
+@posts_router.get("/by_user/{user_id}", response_model=list[PostOut])
+async def get_user_posts(user_id: int):
+    return await dispatch("post", "get_by_user", user_id)
 
 @posts_router.put("/{post_id}", response_model=PostOut)
 async def update_post(post_id: int, new_caption: str):
@@ -40,7 +44,7 @@ async def delete_post_comment(comment_id: int):
     return {"detail": "Comment deleted"}
 
 @posts_router.post("/{post_id}/likes", response_model=PostLikeOut)
-async def like_post(post_id: int, user_id: int, owner_id: int):
+async def like_post(post_id: int, user_id: int, owner_id: int = 0):
     return await record_post_like(post_id, owner_id, user_id)
 
 @posts_router.get("/{post_id}/likes/details", response_model=list[PostLikeOut])

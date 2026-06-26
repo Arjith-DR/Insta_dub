@@ -25,6 +25,7 @@ class User(Base):
     followers = relationship("Follower", foreign_keys="[Follower.follower_id]", back_populates="follower")
     following = relationship("Follower", foreign_keys="[Follower.following_id]", back_populates="following")
     user_roles = relationship("UserRole", back_populates="user")
+    refresh_tokens = relationship("RefreshToken", back_populates="user")
 
 
 class Role(Base):
@@ -46,6 +47,19 @@ class UserRole(Base):
 
     user = relationship("User", back_populates="user_roles")
     role = relationship("Role", back_populates="user_roles")
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    refresh_token_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user.user_id"), nullable=False)
+    token_hash = Column(String, nullable=False, unique=True)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+    revoked = Column(Boolean, nullable=False, default=False)
+
+    user = relationship("User", back_populates="refresh_tokens")
 
 
 class Bio(Base):
@@ -229,3 +243,29 @@ class AdminPrivacyOverride(Base):
     reason = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class PostLike(Base):
+    __tablename__ = "post_likes"
+    __table_args__ = (
+        UniqueConstraint("post_id", "liked_by_user_id", name="unique_post_like"),
+    )
+
+    like_id = Column(Integer, primary_key=True, autoincrement=True)
+    post_id = Column(Integer, ForeignKey("posts.post_id", ondelete="CASCADE"), nullable=False)
+    liked_by_user_id = Column(Integer, ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False)
+    content_owner_user_id = Column(Integer, nullable=True)
+    liked_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ReelLike(Base):
+    __tablename__ = "reel_likes"
+    __table_args__ = (
+        UniqueConstraint("reel_id", "liked_by_user_id", name="unique_reel_like"),
+    )
+
+    like_id = Column(Integer, primary_key=True, autoincrement=True)
+    reel_id = Column(Integer, ForeignKey("reels.reel_id", ondelete="CASCADE"), nullable=False)
+    liked_by_user_id = Column(Integer, ForeignKey("user.user_id", ondelete="CASCADE"), nullable=False)
+    content_owner_user_id = Column(Integer, nullable=True)
+    liked_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)

@@ -1,10 +1,12 @@
+import asyncio
+
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_, delete
 from fastapi import HTTPException
 from settings.database import get_session
 from models import Reel, ReelComment, Privacy, Follower
-from user.crud.mongo_likes import remove_reel_likes_for_reel
+from user.crud.mongo_likes import remove_reel_likes_for_reel, count_reel_likes
 
 
 async def create_reel(user_id: int, video_url: str, caption: str, status="active"):
@@ -44,6 +46,10 @@ async def get_reels(requester_id: int):
                     )
                     if follow_result.scalars().first():
                         visible_reels.append(reel)
+            
+            for reel in visible_reels:
+                reel.likes = await count_reel_likes(reel.reel_id)
+                
             return visible_reels
         except SQLAlchemyError:
             raise HTTPException(status_code=500, detail="Internal server error")
@@ -71,7 +77,10 @@ async def delete_reel(reel_id: int):
         try:
             reel = await session.get(Reel, reel_id)
             if reel:
-                await remove_reel_likes_for_reel(reel_id)
+                try:
+                    await asyncio.wait_for(remove_reel_likes_for_reel(reel_id), timeout=1)
+                except Exception:
+                    pass
                 await session.execute(delete(ReelComment).where(ReelComment.reel_id == reel_id))
                 await session.delete(reel)
                 await session.commit()
@@ -111,5 +120,19 @@ async def delete_reel_comment(comment_id: int):
         except Exception:
             raise HTTPException(status_code=500, detail="Internal server error")
 
+
+async def get_reels_by_user(user_id: int):
+    """Fetch all reels for a specific user (used by profile view)."""
+    async with get_session() as session:
+        try:
+            result = await session.execute(select(Reel).where(Reel.user_id == user_id))
+            reels = result.scalars().all()
+            for reel in reels:
+                reel.likes = await count_reel_likes(reel.reel_id)
+            return reels
+        except SQLAlchemyError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+        except Exception:
+            raise HTTPException(status_code=500, detail="Internal server error")
 
 
